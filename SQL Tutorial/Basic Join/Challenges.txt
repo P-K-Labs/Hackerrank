@@ -1,0 +1,107 @@
+Challenges
+
+Julia asked her students to create some coding challenges. Write a query to print the hacker_id, name, and the total number of challenges created by each student. Sort your results by the total number of challenges in descending order. If more than one student created the same number of challenges, then sort the result by hacker_id. If more than one student created the same number of challenges and the count is less than the maximum number of challenges created, then exclude those students from the result.
+
+Input Format
+
+The following tables contain challenge data:
+
+Hackers: The hacker_id is the id of the hacker, and name is the name of the hacker. 
+
+Challenges: The challenge_id is the id of the challenge, and hacker_id is the id of the student who created the challenge. 
+
+/* these are the columns we want to output */
+select c.hacker_id, h.name ,count(c.hacker_id) as c_count
+
+/* this is the join we want to output them from */
+from Hackers as h
+    inner join Challenges as c on c.hacker_id = h.hacker_id
+
+/* after they have been grouped by hacker */
+group by c.hacker_id, h.name
+
+/* but we want to be selective about which hackers we output */
+/* having is required (instead of where) for filtering on groups */
+having 
+
+    /* output anyone with a count that is equal to... */
+    c_count = 
+        /* the max count that anyone has */
+        (SELECT MAX(temp1.cnt)
+        from (SELECT COUNT(hacker_id) as cnt
+             from Challenges
+             group by hacker_id
+             order by hacker_id) temp1)
+
+    /* or anyone who's count is in... */
+    or c_count in 
+        /* the set of counts... */
+        (select t.cnt
+         from (select count(*) as cnt 
+               from challenges
+               group by hacker_id) t
+         /* who's group of counts... */
+         group by t.cnt
+         /* has only one element */
+         having count(t.cnt) = 1)
+
+/* finally, the order the rows should be output */
+order by c_count DESC, c.hacker_id
+
+
+--OR
+
+/*1st SELECTING THE VALUES requested to be printed*/
+SELECT h.hacker_id, h.name, COUNT(c.challenge_id) AS challenge_counter
+FROM hackers h
+JOIN challenges c
+    ON h.hacker_id = c.hacker_id
+GROUP BY h.hacker_id, h.name
+
+/*2nd applying the values found before*/
+
+HAVING challenge_counter IN (
+    SELECT aux_table.counter
+    FROM(
+        SELECT hacker_id, COUNT(challenge_id) AS counter 
+        FROM challenges
+        GROUP BY hacker_id
+        ORDER BY counter DESC
+    ) AS aux_table
+    GROUP BY aux_table.counter 
+    HAVING COUNT(aux_table.counter) = 1
+)
+OR
+challenge_counter =(
+    SELECT MAX(aux_table.counter)
+    FROM(
+        SELECT hacker_id, COUNT(challenge_id) AS counter
+        FROM challenges
+        GROUP BY hacker_id
+        ORDER BY counter DESC
+    ) AS aux_table)
+/* Finally we order as requested (by counter and hacker_id)*/
+ORDER BY challenge_counter DESC, h.hacker_id ASC;
+
+--OR
+
+/* count total submissions of challenges of each user */
+WITH data
+AS
+(
+SELECT c.hacker_id as id, h.name as name, count(c.hacker_id) as counter
+FROM Hackers h
+JOIN Challenges c on c.hacker_id = h.hacker_id
+GROUP BY c.hacker_id, h.name
+)
+/* select records from above */
+SELECT id,name,counter
+FROM data
+WHERE
+counter=(SELECT max(counter) FROM data) /*select user that has max count submission*/
+OR
+counter in (SELECT counter FROM data
+GROUP BY counter
+HAVING count(counter)=1 ) /*filter out the submission count which is unique*/
+ORDER BY counter desc, id
+
